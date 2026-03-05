@@ -83,3 +83,7 @@ clawhub install xiaohongshu-ops
   - `references/xhs-publish-flows.md`：发布流程（视频/图文/长文）拆解
 - `examples/reply-examples.md`
   - 近场评论对位回复样例（含偏离与修正对照）
+
+## Star 趋势
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Xiangyu-CAS/xiaohongshu-ops-skill&type=Date)](https://star-history.com/#Xiangyu-CAS/xiaohongshu-ops-skill&Date)
