@@ -1,6 +1,6 @@
 ---
 name: xiaohongshu-ops
-description: "End-to-end Xiaohongshu operations including positioning, topic research, content production, publish execution, and post-incident recovery. Reusable across verticals with templates and a concrete 陪你看剧 case preset."
+description: "小红书相关操作，覆盖账号定位、选题研究、内容生产、发布执行与复盘修复的小红书全链路运营技能。凡是小红书的浏览/搜索/发布/评论任务，默认必须使用 OpenClaw 内置浏览器流程并指定 profile=\"openclaw\"；除非用户明确要求，否则不要使用系统 open 或外部浏览器。"
 ---
 
 # Openclaw 小红书运营技能（通用版）
@@ -31,6 +31,7 @@ description: "End-to-end Xiaohongshu operations including positioning, topic res
 执行前先按 `references/xhs-runtime-rules.md` 中“运行规则”执行，优先遵循失败可复用顺序。
 
 - 固定使用内置浏览器 profile：`openclaw`，出现通道异常先切回后再重试。
+- 若 browser（openclaw-manager）能力处于 disabled/不可用：先执行一次轻量重试（如 status/profiles），仍不可用则进入故障引导，明确告知用户“当前浏览器工具未启用”，并引导用户按文档启用后再继续（参考：`https://docs.openclaw.ai/tools/browser`）。
 - 以 `evaluate` 为先，关键节点少量 `snapshot`，单步动作最多重试一次。
 - 失败后保留已获结果，切稳健路径并汇报。
 
