@@ -1,36 +1,28 @@
-<!--
-  xhs-skill README
--->
-
 # xhs-skill
 
-小红书自动运营 Skill，搭配 Openclaw 可以独立运营小红书账号，帮你分析、选题、创作、复盘、复刻。
+小红书自动运营 Skill，帮你分析、选题、创作、复盘、复刻。
 
-基于 Camoufox 反指纹浏览器（CDP），首次扫码登录后 profile 持久化，后续无需重复验证。
+基于 Camoufox 反指纹浏览器，首次扫码登录后 profile 持久化，后续无需重复验证。
 
 ## 核心能力
 
-- ✅ **图文生成**：输入选题，本地渲染封面+正文卡片（8 种主题），组装完整素材包
-- ✅ **一键发布**：CLI 命令直接发布图文笔记（`browser.py publish`）
-- ✅ **首页推荐流分析**：分析推荐内容的传播钩子和内容结构
-- ✅ **账号分析**：分析账号定位，不同笔记之间的差异，为什么某些笔记赞更多
-- ✅ **选题灵感**：结合知识库、账号定位，提供选题灵感
-- ✅ **知识库沉淀**：分析结果和动作自动保存为 Markdown，便于复盘复用
-- ✅ **爆款笔记复刻**：输入爆款笔记 URL，分析爆款因素，生成类似素材
-- ✅ **自动回复评论**：检查新评论并按人设语气回复
-- ✅ **人设管理**：`persona.md` 控制账号定位和回复语气
+- **图文生成**：输入选题，本地渲染封面+正文卡片（8 种主题），组装完整素材包
+- **一键发布**：CLI 命令直接发布图文笔记
+- **首页推荐流分析**：分析推荐内容的传播钩子和内容结构
+- **账号分析**：分析账号定位，不同笔记之间的差异
+- **选题灵感**：结合知识库、账号定位，提供选题灵感
+- **知识库沉淀**：分析结果和动作自动保存为 Markdown
+- **爆款笔记复刻**：输入爆款笔记 URL，分析爆款因素，生成类似素材
+- **自动回复评论**：检查新评论并按人设语气回复
 
 ## 安装
 
 ```bash
-# 方法1: Openclaw / Codex 安装
-帮我安装这个skill，`https://github.com/louiseliu/xhs-skill`
-
-# 方法2: Clawhub 安装
-clawhub install xhs-skill
+pip install camoufox[geoip] markdown pyyaml playwright
+playwright install chromium
 ```
 
-安装后首次运行需扫码登录：
+首次使用需扫码登录：
 
 ```bash
 python scripts/browser.py login
@@ -70,14 +62,13 @@ xhs-skill/
 │   ├── card.html               # 正文卡片 HTML 模板
 │   ├── styles.css              # 公共样式
 │   └── themes/                 # 8 种主题 CSS
-├── references/
-│   ├── xhs-image-text-gen.md   # 图文生成链路（选题→素材包）
-│   ├── xhs-publish-flows.md    # 发布流程拆解
-│   ├── xhs-viral-copy-flow.md  # 爆款复刻流程
-│   ├── xhs-runtime-rules.md    # 运行时规则（认证/浏览器）
-│   ├── xhs-render-params.md    # 渲染参数完整文档
-│   ├── xhs-card-styles.md      # 主题样式预览
-│   └── ...                     # 其他 SOP 文档
+├── references/                 # SOP 文档
+│   ├── xhs-image-text-gen.md   # 图文生成链路
+│   ├── xhs-publish-flows.md    # 发布流程
+│   ├── xhs-viral-copy-flow.md  # 爆款复刻
+│   ├── xhs-runtime-rules.md    # 运行时规则
+│   ├── xhs-render-params.md    # 渲染参数
+│   └── xhs-card-styles.md      # 主题样式预览
 ├── knowledge-base/             # 知识库（分析结果/动作记录）
 └── examples/                   # 垂直场景案例
 ```
@@ -103,10 +94,3 @@ xhs-skill/
 2. 后续使用：profile 自动复用，无需重复登录
 3. Session 过期：自动降级尝试 `.env` 中的 `XHS_COOKIE`（如有）
 4. 都失效：提示重新扫码
-
-## 依赖
-
-```bash
-pip install camoufox[geoip] markdown pyyaml playwright
-playwright install chromium
-```
