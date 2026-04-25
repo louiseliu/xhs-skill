@@ -1,9 +1,9 @@
 ---
-name: xiaohongshu-ops
-description: "小红书相关操作，覆盖账号定位、选题研究、内容生产、发布执行与复盘修复的小红书全链路运营技能。凡是小红书的浏览/搜索/发布/评论任务，默认必须使用 OpenClaw 内置浏览器流程并指定 profile=\"openclaw\"；除非用户明确要求，否则不要使用系统 open 或外部浏览器。"
+name: xhs-skill
+description: "小红书全链路运营技能，覆盖账号定位、选题研究、内容生产、发布执行与复盘修复。所有浏览器操作统一使用 scripts/browser.py（Camoufox 反指纹浏览器），优先使用 profile 持久化登录态（.env Cookie 作降级兜底），隐藏自动化指纹。"
 ---
 
-# Openclaw 小红书运营技能（通用版）
+# 小红书运营技能（通用版）
 
 目标：构建可复用的“小红书运营”流程，让任何账号类型都能复用同一套动作框架。
 
@@ -15,6 +15,7 @@ description: "小红书相关操作，覆盖账号定位、选题研究、内容
 - 小红书发布前演练与内容交付
 - 发布后快速复盘（互动结构、评论回复、热点追踪）
 - Viral Copy 链路（输入 URL，高贴合学习封面/配图、标题、正文并生成可发布近似结构笔记）
+- 图文生成（输入选题，通过即梦API生成封面图+标题+正文+话题的完整素材包）
 
 将每类账号的行业细节作为“案例模块（case module）”挂载到通用流程中。
 
@@ -30,8 +31,20 @@ description: "小红书相关操作，覆盖账号定位、选题研究、内容
 
 执行前先按 `references/xhs-runtime-rules.md` 中“运行规则”执行，优先遵循失败可复用顺序。
 
-- 固定使用内置浏览器 profile：`openclaw`，出现通道异常先切回后再重试。
-- 若 browser（openclaw-manager）能力处于 disabled/不可用：先执行一次轻量重试（如 status/profiles），仍不可用则进入故障引导，明确告知用户“当前浏览器工具未启用”，并引导用户按文档启用后再继续（参考：`https://docs.openclaw.ai/tools/browser`）。
+- **凭据加载**（优先级从高到低）：
+  1. **Profile 持久化登录态（首选）**：`~/.xhs-skill/profiles/` 中保存了跨会话复用的 cookie/localStorage，启动后先检测 profile 登录态是否有效——有效则直接使用，不读取 `.env` 中的 Cookie。
+  2. **`.env` Cookie（降级兜底）**：仅当 profile 登录态失效时，才读取 `.env` 中的 `XHS_COOKIE` 并 import。
+  3. **QR 扫码登录（最终兜底）**：两者均失效时，触发二维码登录，登录成功后 profile 自动持久化。
+  - `.env` 中的其他变量仍正常读取：`JIMENG_SESSION_ID`（生图必须）、`JIMENG_API_URL`（默认 `http://localhost:5100`）、`XHS_DOMAIN`（默认 `xiaohongshu.com`）。
+  - 若 `.env` 缺少必要变量（如 `JIMENG_SESSION_ID`），执行到需要时再向用户索要，拿到后回填 `.env`。
+- **浏览器操作统一使用 `scripts/browser.py`**（Camoufox 反指纹浏览器）：
+  - 所有涉及小红书的浏览/搜索/抓取/发布/评论操作，一律通过 `scripts/browser.py` 中的 BrowserManager 执行
+  - **严禁使用其他浏览器工具**：禁止使用 IDE 内置浏览器、MCP browser 工具（如 `cursor-ide-browser`）、WebFetch、或任何非 Camoufox 的浏览器方式访问小红书。原因：其他浏览器不具备反指纹能力，会暴露自动化痕迹
+  - Camoufox 在 C++ 级修改浏览器指纹（非 JS 注入），`humanize=True` 启用贝塞尔曲线鼠标模拟
+  - **认证必须用 `launch_with_auth()`**：`bm.launch_with_auth(fallback_cookie=env_vars.get("XHS_COOKIE", ""))` 一行搞定 profile-first 认证。**严禁在 `check_login()` 之前调用 `import_cookies()`**——stale cookie 会覆盖 profile 中还有效的登录态。
+  - 持久化 profile 路径：`~/.xhs-skill/profiles/xhs-default`，登录态跨会话自动复用
+  - 常用 CLI 命令：`open`（打开URL+截图）、`scrape`（提取笔记内容）、`evaluate`（执行JS）、`login`（扫码登录）、`check`（检查登录态）、`publish`（发布图文笔记）
+  - 详见 `references/xhs-runtime-rules.md` 0.3 节
 - 以 `evaluate` 为先，关键节点少量 `snapshot`，单步动作最多重试一次。
 - 失败后保留已获结果，切稳健路径并汇报。
 
@@ -134,16 +147,41 @@ description: "小红书相关操作，覆盖账号定位、选题研究、内容
 - 话题（5-8 个）
 - 风险标注（是否剧透 / 引战边界 / 版权风险）
 
-## 5) 通用发布链路（不发稿）
+## 4.5) 图文生成（选题 → 素材包，不发布）
+
+按 `references/xhs-image-text-gen.md` 执行。
+
+- 输入：选题描述
+- 输出：完整的小红书图文素材包（封面图 + 正文卡片 + 标题 × 3 + 正文 + 互动问句 + 话题）
+- **图片生成使用本地渲染**（`scripts/render_xhs.py`），不依赖外部 API：
+  1. 撰写 Markdown 文档（含 frontmatter 封面信息 + 正文内容）
+  2. 调用 `python scripts/render_xhs.py content.md -t sketch -m auto-split --output-dir pic/`
+  3. 自动生成：`cover.png`（封面）+ `card_1.png`、`card_2.png`...（正文卡片）
+- **8 种主题**：`sketch`（手绘，默认推荐）、`playful-geometric`、`neo-brutalism`、`botanical`、`professional`、`retro`、`terminal`、`default`
+- **4 种分页模式**：`separator`（手动 `---` 分页）、`auto-split`（自动拆分，推荐）、`auto-fit`（固定尺寸缩放）、`dynamic`（动态高度）
+- 默认竖版 1080×1440px（3:4 比例）
+- 主题样式参考：`references/xhs-card-styles.md`，完整参数：`references/xhs-render-params.md`
+- **草稿持久化**：生成素材后自动保存到 `knowledge-base/drafts/`，文件含封面路径、标题、正文、话题的完整对应关系
+- **本流程仅生成素材，不执行发布**；用户确认后可衔接第 5 节发布流程
+- 触发语句：「帮我生成一篇小红书图文」「出一套关于 XX 的素材」「生成封面图和文案」
+
+## 5) 通用发布链路
 
 详细发布执行路径请直接按 `references/xhs-publish-flows.md` 执行，避免重复维护。
 
 发布前必须满足的核心点：
 
-- 账号先登录创作后台，确认页面在 `openclaw` profile 可操作。
+- **素材来源**：优先从 `knowledge-base/drafts/` 读取最新的 `status: draft` 草稿文件，获取封面路径、标题、正文、话题的完整对应关系；若无草稿则从当前对话上下文获取。
+- **草稿确认**：从草稿读取素材后，需向用户展示标题/封面/正文摘要，**用户确认后才执行发布**。
+- 通过 `scripts/browser.py` 启动 Camoufox 浏览器，优先使用 profile 持久化登录态，profile 失效时降级导入 `.env` Cookie。
 - 明确发布类型（视频 / 图文 / 长文），三要素：封面、标题、正文。
-- 到达“发布”按钮可见处停手，默认不直接点击发布。
-- 若涉及截图确认，优先附件形式发送到飞书，并在用户确认后再发布。
+- 封面生成默认使用即梦API（`scripts/generate_image.py`），支持文生图和图生图两种模式，详见 `references/xhs-publish-flows.md` 1.4 节。
+- **登录检测**：发布前调用 `check_login()` 检测登录态，失效时自动触发二维码登录流程。
+- **发布模式**（两种，根据用户指令判断）：
+  - **直接发布**（默认）：用户说「发布」「帮我发」「直接发」→ 校验三要素后直接点击发布按钮完成发布
+  - **停手确认**：用户说「先看看」「预览一下」「发布前让我确认」→ 到达发布按钮处停手，截图给用户确认后再点击发布
+- 发布全程通过 Camoufox 反指纹浏览器执行，详见 `references/xhs-publish-flows.md` 1.5 节。
+- **发布后更新草稿状态**：发布成功后将草稿文件的 `status` 从 `draft` 更新为 `published`。
 
 ## 6) 评论与回复（轻量）
 
@@ -200,13 +238,40 @@ description: "小红书相关操作，覆盖账号定位、选题研究、内容
 
 ## 实操经验（持续有效）
 
-- **统一规则：所有浏览器操作一律走内置浏览器 profile=`openclaw`**（除非用户明确要求使用 Chrome 扩展 Relay）。
+- **统一规则：所有浏览器操作一律使用 `scripts/browser.py`（Camoufox 反指纹浏览器）**，登录态优先从 profile 持久化读取，`.env` Cookie 仅作降级兜底。
 - 文字配图是稳定写入口，typed text 直接成为封面文案
 - 发布话题优先用 UI 选题，不建议纯文本粘贴大量 `#话题`
 - `evaluate` 批量改写富文本时，尽量少改版式，避免丢失 topic entity
 - 关键步骤前保留一次快照，可用于复盘与问题定位
-- `发布` 按钮可见 ≠ 发布成功；必须明确标注“到发布页停手”
+- 发布支持两种模式：直接发布（默认）和停手确认（用户要求时），草稿素材发布前均需用户确认
 - 若出现新类型评论节奏问题，优先减少每小时回复密度而非提高频率
+
+### 认证代码模板（编程调用必须遵循）
+
+```python
+from scripts.browser import BrowserManager, DEFAULT_PROFILES_DIR, load_env
+env_vars = load_env()
+bm = BrowserManager(
+    profile_dir=DEFAULT_PROFILES_DIR / "xhs-default",
+    humanize=True, xhs_domain="xiaohongshu.com", window=(1280, 900),
+)
+bm.launch_with_auth(fallback_cookie=env_vars.get("XHS_COOKIE", ""))
+page = bm.page
+```
+
+**⚠️ 严禁在 `check_login()` 之前调用 `import_cookies()`** — stale cookie 会覆盖 profile 里还有效的登录态，导致每次都要重新登录。
+
+### 创作后台发布关键技术点（实测验证 2026-04）
+
+- **创作后台默认 tab 是「上传视频」**，必须先切换到「上传图文」才能发布图文笔记
+- **创作后台 DOM 交互必须用 `page.evaluate()` JS 方式**：Playwright 原生 `.click()` / `.fill()` 在创作后台会因视口外/遮罩问题超时。唯一例外是 `input[type="file"]` 的 `set_input_files()` 可直接使用
+- **正文编辑器是 ProseMirror (TipTap)**：`.fill()` 无效，必须用 `keyboard.type()` 逐字输入 + `keyboard.press("Enter")` 换行
+- **标题输入框必须用 JS nativeInputValueSetter + dispatchEvent**：`.fill()` / `.click()` 均可能超时
+- **发布按钮用 JS 遍历 button 匹配文本点击**：按钮文本为「发布」或「发布笔记」
+- **窗口建议 1280×900**：太小会导致更多元素 outside viewport
+- **操作间必须 sleep**：tab切换(3s)、封面上传(10s)、正文输入(2s)、发布按钮(10s)
+- **发布成功标志**：URL 变为 `?published=true`
+- 详细选择器和代码模板见 `references/xhs-publish-flows.md` 1.5 节
 
 ## 运营成熟路径（可选）
 

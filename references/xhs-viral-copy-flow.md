@@ -5,9 +5,10 @@
 ## 标准四步流程（默认）
 
 1. 输入爆款笔记 URL
-2. 分析爆款因素（标题/封面/正文/互动）
-3. 参考封面图，用 Nano Banana 2 生成新封面（默认 style-only）
-4. 发布（上传图文、填写标题正文，发布前确认）
+2. 使用 `scripts/browser.py scrape` 抓取源笔记内容（标题/正文/封面/互动数据）
+3. 分析爆款因素，拆解模板
+4. 撰写 Markdown + 用 `scripts/render_xhs.py` 本地渲染新封面和正文卡片
+5. 发布（上传图文、填写标题正文，执行发布动作）
 
 ## 1) 输入
 
@@ -19,6 +20,18 @@
 
 ## 2) 源笔记拆解（必须）
 
+**第一步：使用 scrape 获取源笔记内容**
+
+```bash
+python scripts/browser.py scrape "SOURCE_URL" \
+    --screenshot pic/source_note.png \
+    --download-cover pic/source_cover.png
+```
+
+输出 JSON 包含 title、content、cover_url、images、tags、likes、collects、comments、author 等字段。
+
+**第二步：基于抓取结果拆解**
+
 提取并记录：
 - 标题模板：年份/动作词/情绪词/句式（如“请按下确认键”）
 - 封面模板：主文案、信息层级、是否多字大字报、配色
@@ -26,11 +39,15 @@
 - 互动模板：评论区动作词（如“确认”）、参与门槛
 - 标签模板：核心话题与长尾话题
 
-封面抓取规则（轮播页强制）：
-- 不要使用第一个 `.img-container img`。
-- 优先抓取：`.swiper-slide-active:not(.swiper-slide-duplicate) .img-container img`
-- 兜底抓取：`.swiper-slide-active .img-container img`
-- 取 `currentSrc || src`，再转存为 PNG/JPG 后用于生图输入。
+封面抓取规则（scrape 内部已实现，兜底时使用 evaluate）：
+- scrape 命令已内置正确的轮播页封面抓取逻辑（优先 `swiper-slide-active` 排除 `duplicate`）
+- `--download-cover` 可直接下载封面到本地，用于后续图生图
+- 若 scrape 未能正确抓到封面，使用 evaluate 命令手动执行 JS：
+
+```bash
+python scripts/browser.py evaluate "SOURCE_URL" \
+    --js "document.querySelector('.swiper-slide-active:not(.swiper-slide-duplicate) .img-container img')?.currentSrc"
+```
 
 本次实战记录（699e7680000000002801fd62）：
 - 直接取第一个 `.img-container` 会抓到错误封面（常见是上一张或 duplicate）。
@@ -38,6 +55,51 @@
 - 已验证有效封面 key：`1040g3k031t0du6pc5s005qbtv55n7e4t2h6fqk8`（active 图）。
 
 输出 `Source Template`（简短结构化）。
+
+## 2.5) 本地渲染新封面和正文卡片（核心步骤）
+
+基于源笔记拆解结果，撰写 Markdown 并用 `render_xhs.py` 本地渲染。
+
+### Step 1：撰写渲染用 Markdown
+
+```markdown
+---
+emoji: "🔥"
+title: "新封面大标题（≤15字）"
+subtitle: "新封面副标题（≤15字）"
+---
+
+# 第一张正文卡片内容
+
+要点一...
+
+要点二...
+
+---
+
+# 第二张正文卡片内容
+
+...
+```
+
+### Step 2：渲染图片
+
+```bash
+python scripts/render_xhs.py content.md -t sketch -m auto-split --output-dir pic/
+```
+
+生成：`pic/cover.png`（封面）+ `pic/card_1.png`、`pic/card_2.png`...（正文卡片）
+
+### 主题选择
+
+根据源笔记风格选择匹配的主题：
+- 简约/大字报 → `sketch`（默认推荐）或 `default`
+- 活泼/几何 → `playful-geometric`
+- 粗野/冲击力 → `neo-brutalism`
+- 清新/自然 → `botanical`
+- 专业/商务 → `professional`
+- 复古/怀旧 → `retro`
+- 极客/技术 → `terminal`
 
 ## 3) Viral Copy 改写规则（tight）
 
@@ -77,7 +139,7 @@
 
 - 图文上传
 - 填标题正文
-- 发布前停在按钮处确认
+- 校验三要素后 **执行发布动作**（直接发布 or 停手确认，取决于用户指令）
 
 ## 6) 风险与合规
 

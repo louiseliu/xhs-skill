@@ -14,6 +14,7 @@ knowledge-base/
   patterns/              # 爆款结构、封面模板、互动钩子、复用规则
   actions/               # 发布、回复、抓取、下载、复刻等动作记录
   reviews/               # 复盘、有效/无效原因、下次调整建议
+  drafts/                # 待发布素材包（图文生成后自动保存，发布时读取）
 ```
 
 ## 2. 使用规则
@@ -63,6 +64,7 @@ knowledge-base/
 - 可复用模式：`knowledge-base/patterns/`
 - 动作记录：`knowledge-base/actions/`
 - 结果复盘：`knowledge-base/reviews/`
+- 待发布草稿：`knowledge-base/drafts/`
 
 ## 7. 写入最小标准
 

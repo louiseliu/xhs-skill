@@ -1,3 +1,23 @@
+# Sensitive credentials
+.env
+
+# Generated images
+pic/
+
+# IDE / Editor
+.idea/
+.cursor/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# MCP task manager
+mcp-shrimp-task-manager/
+
+# Agent skills (copied from external sources)
+.agents/
+
 # Local knowledge base records are generated during operation and should stay local.
 knowledge-base/**
 !knowledge-base/
