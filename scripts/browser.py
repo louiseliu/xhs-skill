@@ -30,7 +30,13 @@ DEFAULT_PROFILES_DIR = Path.home() / ".xhs-skill" / "profiles"
 
 
 def load_env(env_path: Optional[Path] = None) -> dict:
-    """Load .env file, searching upward from cwd if no path given."""
+    """Load .env file, searching upward from cwd if no path given.
+
+    Fallback order:
+    1. Explicit env_path argument
+    2. Walk up from cwd looking for .env (stops at .git / SKILL.md boundary)
+    3. Skill directory .env (via __file__ → scripts/browser.py → ../.env)
+    """
     if env_path and env_path.exists():
         return _parse_env(env_path)
     current = Path.cwd()
@@ -41,6 +47,10 @@ def load_env(env_path: Optional[Path] = None) -> dict:
         if any((current / m).exists() for m in [".git", "SKILL.md"]):
             return _parse_env(candidate)
         current = current.parent
+
+    skill_env = Path(__file__).resolve().parent.parent / ".env"
+    if skill_env.exists():
+        return _parse_env(skill_env)
     return {}
 
 
@@ -665,6 +675,7 @@ def main():
     login_parser.add_argument("--save-cookie", action="store_true", help="Save cookies to .env after login")
 
     check_parser = subparsers.add_parser("check", parents=[common_args], help="Check XHS login status")
+    check_parser.add_argument("--json", action="store_true", dest="json_output", help="Output result as JSON (for agent/CI integration)")
 
     scrape_parser = subparsers.add_parser("scrape", parents=[common_args], help="Scrape XHS note content")
     scrape_parser.add_argument("url", help="XHS note URL to scrape")
@@ -770,13 +781,25 @@ def main():
                 print("✅ Done")
 
         elif args.command == "check":
+            import json as json_mod
             print("🔍 Checking login status...")
             logged_in = bm.check_login()
-            if logged_in:
-                print("✅ Login status: LOGGED IN")
+
+            if getattr(args, "json_output", False):
+                result = {
+                    "logged_in": logged_in,
+                    "profile": profile_name,
+                    "profile_path": str(profile_dir),
+                    "profile_exists": profile_dir.exists(),
+                    "cookie_fallback_available": bool(xhs_cookie),
+                }
+                print(json_mod.dumps(result, ensure_ascii=False))
             else:
-                print("❌ Login status: NOT LOGGED IN")
-                print("   Run: python scripts/browser.py login")
+                if logged_in:
+                    print("✅ Login status: LOGGED IN")
+                else:
+                    print("❌ Login status: NOT LOGGED IN")
+                    print("   Run: python scripts/browser.py login")
             sys.exit(0 if logged_in else 1)
 
         elif args.command == "login":

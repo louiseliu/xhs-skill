@@ -54,13 +54,19 @@ bm.launch_with_auth(fallback_cookie=env_vars.get("XHS_COOKIE", ""))
 
 **CLI 快捷方式**：
 ```bash
-python scripts/browser.py check                                    # 检查登录状态
+python scripts/browser.py check                                    # 检查登录状态（人类可读）
+python scripts/browser.py check --json                             # 检查登录状态（JSON，Agent/CI 专用）
 python scripts/browser.py login                                    # 扫码登录（session 自动持久化到 profile）
 python scripts/browser.py scrape "URL" --download-cover pic/c.png  # 抓取笔记内容
 python scripts/browser.py evaluate "URL" --js "document.title"     # 执行 JS
 python scripts/browser.py publish --cover pic/cover.png --title "标题" --body "正文\\n#话题"  # 发布图文
 python scripts/browser.py publish --cover pic/cover.png --title "标题" --body "正文" --dry-run  # 预览不发布
 python scripts/browser.py reset --confirm                          # 清除 profile（重置登录态）
+```
+
+**`check --json` 返回格式**：
+```json
+{"logged_in": true, "profile": "xhs-default", "profile_path": "/Users/.../.xhs-skill/profiles/xhs-default", "profile_exists": true, "cookie_fallback_available": false}
 ```
 
 ### 登录方式（按推荐优先级）
@@ -76,6 +82,12 @@ python scripts/browser.py reset --confirm                          # 清除 prof
 - 两者均失效时触发 QR 扫码登录，登录成功后 profile 自动持久化
 - 连续 2 次点击/导航失败后改稳健路径（如直达点击改为 evaluate+定位），不做盲重试
 - Camoufox 通道支持两种发布模式：直接发布（默认）和停手确认（用户要求时）
+
+### OpenClaw/QClaw 环境特殊规则
+- **cwd 不是技能目录**：`load_env()` 已内置回退，从 `__file__` 定位技能目录的 `.env`，无需手动指定路径
+- **强制 pre-flight check**：每次浏览器操作前执行 `python scripts/browser.py check --json`，解析 `logged_in` 字段
+- **登录失效 → 中断通知，不降级**：QClaw 没有交互式终端，不要尝试 QR 扫码——直接中断并告知用户手动 `python scripts/browser.py login`
+- **不使用 QClaw 内置 browser 工具**：QClaw 的 `browser` 工具（profile: `openclaw`）与 Camoufox 的 `~/.xhs-skill/profiles/` 互不相通
 
 ### DOM 交互原则（创作后台专用）
 

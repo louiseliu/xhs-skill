@@ -48,6 +48,20 @@ description: "小红书全链路运营技能，覆盖账号定位、选题研究
 - 以 `evaluate` 为先，关键节点少量 `snapshot`，单步动作最多重试一次。
 - 失败后保留已获结果，切稳健路径并汇报。
 
+### OpenClaw/QClaw 部署约束
+
+当技能在 OpenClaw（QClaw）环境中执行时，存在以下额外约束：
+
+1. **cwd 不是技能目录**：QClaw 的工作目录是 `~/.qclaw/workspace*`，不是 xhs-skill 项目目录。`scripts/browser.py` 的 `load_env()` 已内置回退：优先从 cwd 向上查找 `.env`，找不到时自动回退到技能目录下的 `.env`（通过 `__file__` 定位）。
+2. **Profile 绝对路径**：`~/.xhs-skill/profiles/xhs-default` 是绝对路径，不受 cwd 影响，跨环境可用。
+3. **Pre-flight check 强制前置**：每次涉及小红书浏览器操作前，**必须先执行**：
+   ```bash
+   python scripts/browser.py check --json
+   ```
+   解析返回的 `{"logged_in": true/false, ...}` 判断登录态。
+4. **登录失效 → 立即中断，不降级**：如果 `logged_in` 为 `false`，**立即中断当前任务并通知用户**，提示手动执行 `python scripts/browser.py login` 扫码登录。**不要在 QClaw 会话中尝试自动触发 QR 扫码流程**——QClaw 没有交互式终端，扫码无法完成，只会浪费时间。
+5. **不使用 QClaw 内置 browser 工具**：QClaw 自带的 `browser` 工具（profile: `openclaw`）与本技能的 Camoufox 浏览器是独立的两套系统，Cookie/登录态互不相通。所有小红书操作必须通过 `scripts/browser.py`。
+
 ## 1) 技能默认行为（所有任务都遵循）
 
 - **先读本技能目录下的 `persona.md`**（小红书平台专用人设/语气/发布与回复风格）。所有对外文案（发帖/评论回复/私信话术）都必须遵循。
